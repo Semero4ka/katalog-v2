@@ -1,5 +1,5 @@
 const DB_NAME='catalogPWA', DB_VERSION=1;
-let db, products=[], cart={}, orders=[], settings={supplier:'',buyer:''}, currentView='catalog', toastTimer;
+let db, products=[], cart={}, orders=[], settings={supplier:'',buyer:''}, currentView='catalog', toastTimer, selectedCategory='Все категории';
 const $=s=>document.querySelector(s);
 const money=n=>new Intl.NumberFormat('ru-RU',{style:'currency',currency:'RUB',maximumFractionDigits:2}).format(Number(n)||0);
 const fmtQty=n=>new Intl.NumberFormat('ru-RU',{maximumFractionDigits:3}).format(Number(n)||0);
@@ -39,40 +39,38 @@ function showView(v){currentView=v;document.querySelectorAll('.view').forEach(x=
 document.querySelectorAll('.nav').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.view)));
 function renderCatalog(){
  const q=$('#search').value.trim().toLowerCase(), sf=$('#stockFilter').value, sort=$('#sort').value;
+ const categories=[...new Set(products.map(p=>p.category||'Без категории'))];
+ if(selectedCategory!=='Все категории'&&!categories.includes(selectedCategory))selectedCategory='Все категории';
+ const nav=$('#categoryNav');nav.innerHTML='';
+ const makeChip=(label,active)=>{const b=document.createElement('button');b.type='button';b.className='category-chip'+(active?' active':'');b.textContent=label;b.setAttribute('aria-pressed',active?'true':'false');b.addEventListener('click',()=>{selectedCategory=label;renderCatalog();});nav.append(b)};
+ makeChip('Все категории',selectedCategory==='Все категории');
+ categories.forEach(c=>makeChip(c,selectedCategory===c));
  let arr=products.filter(p=>p.name.toLowerCase().includes(q));
+ // Search is global; when the search field is empty, the selected category controls the view.
+ if(!q&&selectedCategory!=='Все категории')arr=arr.filter(p=>(p.category||'Без категории')===selectedCategory);
  arr=arr.filter(p=>{const a=available(p);if(sf==='available')return a!==null&&a>0;if(sf==='unknown')return a===null;if(sf==='zero')return a!==null&&a<=0;return true});
  const cmp=(a,b)=>sort==='priceAsc'?(a.price??Infinity)-(b.price??Infinity):sort==='priceDesc'?(b.price??-Infinity)-(a.price??-Infinity):sort==='stock'?(available(b)??-Infinity)-(available(a)??-Infinity):a.name.localeCompare(b.name,'ru');
  const list=$('#catalogList');list.innerHTML='';$('#catalogEmpty').classList.toggle('hidden',arr.length>0);
  if(!arr.length)return;
- // Keep category order from the source price list; sort products only inside each category.
- const groups=new Map();
- arr.forEach(p=>{const c=p.category||'Без категории';if(!groups.has(c))groups.set(c,[]);groups.get(c).push(p)});
- for(const [category,items] of groups){
-  items.sort(cmp);
-  const section=document.createElement('details');section.className='category-section';
-  // Search results open automatically so a matching product is immediately visible.
-  if(q) section.open=true;
-  const summary=document.createElement('summary');summary.className='category-heading';
-  const title=document.createElement('span');title.textContent=category;
-  const count=document.createElement('span');count.className='category-count';count.textContent=`${items.length} ${items.length===1?'товар':items.length<5?'товара':'товаров'}`;
-  summary.append(title,count);section.append(summary);
-  const productList=document.createElement('div');productList.className='category-products';
-  // Limit each category to 250 rendered items to keep very large lists responsive.
-  items.slice(0,250).forEach(p=>{
-   const a=available(p), row=document.createElement('div');row.className='product';
-   const thumb=document.createElement('div');thumb.className='thumb';
-   if(p.photo){const im=document.createElement('img');im.src=p.photo;im.alt=p.name;im.style.cssText='width:100%;height:100%;object-fit:cover;border-radius:8px';thumb.append(im)}else thumb.textContent='Добавить фото';
-   thumb.title='Нажмите, чтобы добавить или открыть фото';thumb.addEventListener('click',()=>photoAction(p));
-   const info=document.createElement('div');info.innerHTML=`<div class="pname"></div><div class="pmeta">Артикул: ${p.id}</div>`;info.querySelector('.pname').textContent=p.name;
-   const price=document.createElement('div');price.className='price';price.textContent=p.price==null?'Цена не указана':money(p.price);
-   const stock=document.createElement('div');stock.className='stock '+(a===null?'':a>0?'good':'zero');stock.textContent=a===null?'Остаток не указан':`Доступно: ${fmtQty(a)}`;
-   const add=document.createElement('div');add.className='addrow';const inp=document.createElement('input');inp.type='number';inp.min='0.001';inp.step='any';inp.value='1';inp.className='qtyinput';inp.setAttribute('aria-label','Количество');
-   const btn=document.createElement('button');btn.className='primary addbtn';btn.textContent='В корзину';btn.addEventListener('click',()=>addToCart(p.id,inp.value));
-   add.append(inp,btn);row.append(thumb,info,price,stock,add);productList.append(row);
-  });
-  if(items.length>250){const more=document.createElement('p');more.className='muted';more.textContent=`В разделе показаны первые 250 из ${items.length} товаров. Уточните поиск, чтобы быстрее найти нужный товар.`;productList.append(more)}
-  section.append(productList);list.append(section);
- }
+ // In category view, show a flat list of products; category navigation is a horizontal scroll strip.
+ arr.sort((a,b)=>{
+  if(q||selectedCategory!=='Все категории')return cmp(a,b);
+  const ca=categories.indexOf(a.category||'Без категории'),cb=categories.indexOf(b.category||'Без категории');
+  return ca-cb||cmp(a,b);
+ });
+ arr.slice(0,1000).forEach(p=>{
+  const a=available(p), row=document.createElement('div');row.className='product';
+  const thumb=document.createElement('div');thumb.className='thumb';
+  if(p.photo){const im=document.createElement('img');im.src=p.photo;im.alt=p.name;im.style.cssText='width:100%;height:100%;object-fit:cover;border-radius:8px';thumb.append(im)}else thumb.textContent='Добавить фото';
+  thumb.title='Нажмите, чтобы добавить или открыть фото';thumb.addEventListener('click',()=>photoAction(p));
+  const info=document.createElement('div');info.innerHTML='<div class="pname"></div><div class="pmeta"></div>';info.querySelector('.pname').textContent=p.name;info.querySelector('.pmeta').textContent=`${p.category||'Без категории'} · Артикул: ${p.id}`;
+  const price=document.createElement('div');price.className='price';price.textContent=p.price==null?'Цена не указана':money(p.price);
+  const stock=document.createElement('div');stock.className='stock '+(a===null?'':a>0?'good':'zero');stock.textContent=a===null?'Остаток не указан':`Доступно: ${fmtQty(a)}`;
+  const add=document.createElement('div');add.className='addrow';const inp=document.createElement('input');inp.type='number';inp.min='0.001';inp.step='any';inp.value='1';inp.className='qtyinput';inp.setAttribute('aria-label','Количество');
+  const btn=document.createElement('button');btn.className='primary addbtn';btn.textContent='В корзину';btn.addEventListener('click',()=>addToCart(p.id,inp.value));
+  add.append(inp,btn);row.append(thumb,info,price,stock,add);list.append(row);
+ });
+ if(arr.length>1000){const more=document.createElement('p');more.className='muted';more.textContent=`Показаны первые 1000 из ${arr.length} товаров. Уточните поиск или выберите категорию.`;list.append(more)}
 }
 async function addToCart(id,raw){const p=productById(id),q=Number(raw);if(!p||!Number.isFinite(q)||q<=0){toast('Укажите корректное количество');return}const a=available(p);if(a!==null&&q>a+1e-9){toast(`Недостаточно остатка. Доступно: ${fmtQty(Math.max(0,a))}`);return}cart[id]=Number(cart[id]||0)+q;await saveState('cart',cart);renderAll();toast('Товар добавлен; остаток зарезервирован');}
 async function setCartQty(id,raw){const q=Number(raw),old=Number(cart[id]||0),p=productById(id);if(!p)return;if(!Number.isFinite(q)||q<=0){await removeCart(id);return}const a=available(p);const max=a===null?null:a+old;if(max!==null&&q>max){toast(`Доступно с учётом текущего резерва: ${fmtQty(max)}`);renderCart();return}cart[id]=q;await saveState('cart',cart);renderAll();}
@@ -118,9 +116,9 @@ function openInvoice(id){const o=orders.find(x=>x.id===id);if(!o)return;if(!o.in
  $('#shareInvoice').addEventListener('click',async()=>{const text=invoiceText(o);if(navigator.share){try{await navigator.share({title:'Накладная '+o.id,text})}catch(e){}}else{await navigator.clipboard?.writeText(text);toast('Текст накладной скопирован, если браузер разрешил копирование')}});
  recalcInvoice();
 }
-function addInvoiceRow(item){const body=$('#invRows'),tr=document.createElement('tr');tr.innerHTML=`<td class="idx"></td><td><div class="itemname-wrap"><textarea class="itemname" rows="2" aria-label="Товар"></textarea><span class="itemname-print"></span></div></td><td><input class="qty right" type="number" step="any" min="0" aria-label="Количество"></td><td><input class="price right" type="number" step="any" min="0" aria-label="Цена"></td><td class="sum right">0,00</td><td class="no-print"><button class="danger rowdel">×</button></td>`;
- tr.querySelector('.itemname').value=item.name||'';tr.querySelector('.itemname').style.height='auto';tr.querySelector('.itemname').style.height=Math.max(42,tr.querySelector('.itemname').scrollHeight)+'px';tr.querySelector('.qty').value=item.qty??1;tr.querySelector('.price').value=item.price??0;
- tr.querySelectorAll('input,textarea').forEach(inp=>inp.addEventListener('input',()=>{if(inp.classList.contains('itemname')){inp.style.height='auto';inp.style.height=inp.scrollHeight+'px'}recalcInvoice()}));tr.querySelector('.rowdel').addEventListener('click',()=>{tr.remove();recalcInvoice()});body.append(tr);recalcInvoice()}
+function addInvoiceRow(item){const body=$('#invRows'),tr=document.createElement('tr');tr.innerHTML=`<td class="idx"></td><td><div class="itemname-wrap"><textarea class="itemname" rows="2" aria-label="Полное наименование товара" spellcheck="false"></textarea><span class="itemname-print"></span></div></td><td><input class="qty right" type="number" step="any" min="0" aria-label="Количество"></td><td><input class="price right" type="number" step="any" min="0" aria-label="Цена"></td><td class="sum right">0,00</td><td class="no-print"><button class="danger rowdel">×</button></td>`;
+ const nameField=tr.querySelector('.itemname');nameField.value=item.name||'';nameField.style.height='auto';requestAnimationFrame(()=>{nameField.style.height=Math.max(48,nameField.scrollHeight+2)+'px'});tr.querySelector('.qty').value=item.qty??1;tr.querySelector('.price').value=item.price??0;
+ tr.querySelectorAll('input,textarea').forEach(inp=>inp.addEventListener('input',()=>{if(inp.classList.contains('itemname')){inp.style.height='auto';inp.style.height=Math.max(48,inp.scrollHeight+2)+'px'}recalcInvoice()}));tr.querySelector('.rowdel').addEventListener('click',()=>{tr.remove();recalcInvoice()});body.append(tr);recalcInvoice()}
 function readInvoiceRow(tr){return {productId:'',name:tr.querySelector('.itemname').value,qty:Number(tr.querySelector('.qty').value)||0,price:Number(tr.querySelector('.price').value)||0}}
 function recalcInvoice(){const rows=[...($('#invRows')?.querySelectorAll('tr')||[])];let total=0;rows.forEach((tr,i)=>{tr.querySelector('.idx').textContent=i+1;const q=Number(tr.querySelector('.qty').value)||0,p=Number(tr.querySelector('.price').value)||0,s=q*p;total+=s;tr.querySelector('.sum').textContent=new Intl.NumberFormat('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2}).format(s)});if($('#invTotal'))$('#invTotal').textContent=money(total);if($('#invCount'))$('#invCount').textContent=rows.filter(tr=>tr.querySelector('.itemname').value.trim()).length;if($('#invTotalText'))$('#invTotalText').textContent=money(total);if($('#invWords'))$('#invWords').textContent=numberWordsRub(total)}
 async function saveInvoiceQuiet(o){o.invoice={supplier:$('#invSupplier').value,buyer:$('#invBuyer').value,releasedBy:$('#invReleased').value,receivedBy:$('#invReceived').value,items:[...$('#invRows').querySelectorAll('tr')].map(readInvoiceRow)};await put('orders',o);orders=await all('orders');}
@@ -135,7 +133,7 @@ function rubDecl(n){return plural(n,'рубль','рубля','рублей')}fu
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 async function photoAction(p){if(p.photo){openModal(`<h2>${esc(p.name)}</h2><img src="${p.photo}" alt="" style="display:block;max-width:100%;max-height:65vh;margin:auto"><div class="invoice-buttons"><button id="replacePhoto" class="primary">Заменить фото</button><button id="removePhoto" class="danger">Удалить фото</button></div>`);$('#replacePhoto').onclick=()=>pickPhoto(p);$('#removePhoto').onclick=async()=>{p.photo=null;await put('products',p);products=await all('products');closeModal();renderCatalog()};}else pickPhoto(p)}
 function pickPhoto(p){const input=document.createElement('input');input.type='file';input.accept='image/*';input.onchange=async()=>{const file=input.files[0];if(!file)return;if(file.size>6*1024*1024){toast('Фото больше 6 МБ. Выберите файл меньшего размера.');return}const data=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(file)});p.photo=data;await put('products',p);products=await all('products');closeModal();renderCatalog();toast('Фото сохранено на этом устройстве')};input.click()}
-$('#search').addEventListener('input',renderCatalog);$('#stockFilter').addEventListener('change',renderCatalog);$('#sort').addEventListener('change',renderCatalog);
+$('#search').addEventListener('input',()=>{if($('#search').value.trim())selectedCategory='Все категории';renderCatalog()});$('#stockFilter').addEventListener('change',renderCatalog);$('#sort').addEventListener('change',renderCatalog);
 $('#saveParties').addEventListener('click',async()=>{settings.supplier=$('#supplier').value;settings.buyer=$('#buyer').value;await saveState('settings',settings);toast('Реквизиты сохранены')});
 function parseExcel(file,skipRows){return new Promise((resolve,reject)=>{if(!window.XLSX){reject(new Error('Библиотека Excel не загрузилась. Подключитесь к интернету и обновите страницу.'));return}const reader=new FileReader();reader.onload=e=>{try{let wb=XLSX.read(e.target.result,{type:'array'}),ws=wb.Sheets[wb.SheetNames[0]],rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:null});resolve(rows.slice(skipRows))}catch(err){reject(err)}};reader.onerror=reject;reader.readAsArrayBuffer(file)})}
 const PRICE_CATEGORIES=new Set(['ЯЯ','БАКАЛЕЯ','БАТОНЧИКИ','БЫТОВЫЕ ТОВАРЫ','ВОДА','ЖЕВАТЕЛЬНАЯ РЕЗИНКА','ЗАЖИГАЛКИ','ЗАМОРОЗКА','ЗЕФИР','КАША,СУП,МИВИНА','КИНДЕР','КОЛБАСКИ','КОНДИТЕРСКИЕ ИЗДЕЛИЯ','КОНФЕТЫ В КОРОБКАХ','КОНФЕТЫ ВЕСОВЫЕ','КОРМ','КОФЕ','КРУПЫ ВЕСОВЫЕ','КРУПЫ ФАСОВКА','КУКУРУЗНЫЕ ПАЛОЧКИ','ЛЕДЕНЦЫ','ЛЕТО','МАЙОНЕЗ,КЕТЧУП,СОУС','МАКАРОНЫ','МОЛОЧНЫЕ ПРОДУКТЫ','МОРОЖЕНОЕ','НАША ФАСОВКА','НОВОГОДНИЕ ИГРУШКИ','НОВОГОДНИЕ ПОДАРКИ','НОВЫЙ ГОД','ПАКЕТЫ','ПАСХА','ПЕЧЕНЬЕ','ПЕЧЕНЬЕ В КОРРЕКСАХ','ПЕЧЕНЬЕ ВЕСОВОЕ','ПИВО','ПРЕСЕРВА','ПРИПРАВЫ','СМЕСЬ ПРИПРАВ','РАСТИТЕЛЬНОЕ МАСЛО','РЫБА','РЫБА К ПИВУ','РЫБНЫЕ КОНСЕРВЫ','СОКИ','СОЛЕНЬЯ','СУХИЕ ЗАВТРАКИ','СЫР ВЕСОВОЙ','ТОППИНГИ И СИРОПЫ','ХОТ ДОГ','ЧАЙ','ЧИПСЫ,СУХАРИКИ,ОРЕШКИ','ШОКОЛАД','ЭНЕРГЕТИКИ','ЯНЕНУЖНОЕ','ЯШКИНО']);

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#24364b">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="stylesheet" href="./styles.css">
+<title>Каталог товаров и накладные</title>
+</head>
+<body>
+<header class="topbar">
+  <div><div class="brand">Каталог товаров</div><div class="subbrand">Корзина · склад · накладные</div></div>
+  <nav>
+    <button class="nav active" data-view="catalog">Каталог</button>
+    <button class="nav" data-view="cart">Корзина <span id="cartBadge" class="badge">0</span></button>
+    <button class="nav" data-view="orders">Заказы</button>
+    <button class="nav" data-view="settings">Данные</button>
+  </nav>
+</header>
+<main>
+<section id="view-catalog" class="view">
+  <div class="page-head"><div><h1>Каталог</h1><p class="muted">Поиск по названию, добавление в корзину и фото товара.</p></div><div class="stats"><span id="productCount">Загрузка…</span></div></div>
+  <div class="toolbar">
+    <input id="search" type="search" placeholder="Найти товар по названию…" autocomplete="off">
+    <select id="stockFilter"><option value="all">Все товары</option><option value="available">Есть остаток</option><option value="unknown">Остаток не указан</option><option value="zero">Нет в наличии</option></select>
+    <select id="sort"><option value="name">По названию</option><option value="priceAsc">Сначала дешевле</option><option value="priceDesc">Сначала дороже</option><option value="stock">По остатку</option></select>
+  </div>
+  <div id="catalogList" class="product-list"></div>
+  <div id="catalogEmpty" class="empty hidden">Ничего не найдено.</div>
+</section>
+<section id="view-cart" class="view hidden">
+  <div class="page-head"><div><h1>Корзина</h1><p class="muted">При добавлении товара его доступный остаток сразу уменьшается.</p></div></div>
+  <div id="cartList"></div>
+  <div id="cartSummary" class="summary-panel"></div>
+  <div class="actions"><button id="clearCart" class="secondary">Очистить корзину</button><button id="makeOrder" class="primary">Оформить заказ</button></div>
+</section>
+<section id="view-orders" class="view hidden">
+  <div class="page-head"><div><h1>Заказы и накладные</h1><p class="muted">Заказы сохраняются на этом устройстве. Накладную можно открыть повторно и отредактировать.</p></div></div>
+  <div id="ordersList"></div>
+</section>
+<section id="view-settings" class="view hidden">
+  <div class="page-head"><div><h1>Данные и импорт</h1><p class="muted">Локальная версия для одного устройства; резервные копии сохраняются в файл.</p></div></div>
+  <div class="settings-grid">
+    <article class="panel">
+      <h2>Импорт прайс-листа Excel</h2>
+      <p>Выберите .xlsx/.xls. В прайс-листе пропускаются первые 4 строки отчётной шапки. Цены обновятся по названию, новые товары добавятся.</p>
+      <input id="priceImport" type="file" accept=".xlsx,.xls,.csv">
+      <button id="importPrice" class="primary">Импортировать цены</button>
+    </article>
+    <article class="panel">
+      <h2>Импорт остатков Excel</h2>
+      <p>В таблице остатков пропускаются первые 3 строки. Остатки обновляются по названию товара; неизвестные количества остаются помеченными отдельно.</p>
+      <input id="stockImport" type="file" accept=".xlsx,.xls,.csv">
+      <button id="importStock" class="primary">Импортировать остатки</button>
+    </article>
+    <article class="panel">
+      <h2>Поставщик и покупатель</h2>
+      <label>Поставщик<input id="supplier" placeholder="Название, ИНН, адрес"></label>
+      <label>Покупатель<input id="buyer" placeholder="Название, ИНН, адрес"></label>
+      <button id="saveParties" class="primary">Сохранить реквизиты</button>
+    </article>
+    <article class="panel">
+      <h2>Резервная копия</h2>
+      <p>Экспортируйте каталог, фотографии, корзину, заказы и настройки. При переносе на другое устройство импортируйте этот файл.</p>
+      <div class="actions wrap"><button id="exportBackup" class="primary">Скачать резервную копию</button><label class="filebutton secondary">Восстановить копию<input id="importBackup" type="file" accept=".json,application/json"></label></div>
+    </article>
+    <article class="panel warning">
+      <h2>Важно о хранении данных</h2>
+      <p>GitHub Pages размещает приложение, но не хранит ваши заказы. Данные находятся в браузере на этом устройстве. Не очищайте данные сайта без резервной копии. Для общей работы с нескольких устройств или автоматической отправки заказов в 1С понадобится серверная часть.</p>
+    </article>
+  </div>
+  <div id="importStatus" class="muted status"></div>
+</section>
+</main>
+<div id="toast" class="toast" role="status"></div>
+<div id="modal" class="modal hidden"><div class="modal-backdrop" data-close="1"></div><div class="modal-card"><button class="modal-x" data-close="1">×</button><div id="modalContent"></div></div></div>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="./app.js"></script>
+</body></html>

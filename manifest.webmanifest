@@ -1,0 +1,10 @@
+{
+  "name": "Каталог товаров и накладные",
+  "short_name": "Каталог",
+  "description": "Локальный каталог товаров, корзина, складские резервы и накладные",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f5f6f8",
+  "theme_color": "#24364b",
+  "icons": []
+}

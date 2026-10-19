@@ -38,23 +38,27 @@ function renderAll(){renderCatalog();renderCart();renderOrders();$('#cartBadge')
 function showView(v){currentView=v;document.querySelectorAll('.view').forEach(x=>x.classList.add('hidden'));$('#view-'+v).classList.remove('hidden');document.querySelectorAll('.nav').forEach(b=>b.classList.toggle('active',b.dataset.view===v));if(v==='cart')renderCart();if(v==='orders')renderOrders();}
 document.querySelectorAll('.nav').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.view)));
 function renderCatalog(){
- const q=$('#search').value.trim().toLowerCase(), sf=$('#stockFilter').value, sort=$('#sort').value;
+ const q=$('#search').value.trim().toLowerCase(), cq=$('#categorySearch').value.trim().toLowerCase(), sf=$('#stockFilter').value, sort=$('#sort').value;
  const categories=[...new Set(products.map(p=>p.category||'Без категории'))];
  if(selectedCategory!=='Все категории'&&!categories.includes(selectedCategory))selectedCategory='Все категории';
+ const inCategory=selectedCategory!=='Все категории'&&!q;
+ const categorySearchWrap=$('#categorySearchWrap');
+ categorySearchWrap.classList.toggle('hidden',!inCategory);
+ $('#categorySearchLabel').textContent=`Поиск в категории «${selectedCategory}»`;
+ $('#categorySearch').placeholder=`Найти товар в категории «${selectedCategory}»…`;
  const nav=$('#categoryNav');nav.innerHTML='';
- const makeChip=(label,active)=>{const b=document.createElement('button');b.type='button';b.className='category-chip'+(active?' active':'');b.textContent=label;b.setAttribute('aria-pressed',active?'true':'false');b.addEventListener('click',()=>{selectedCategory=label;renderCatalog();});nav.append(b)};
+ const makeChip=(label,active)=>{const b=document.createElement('button');b.type='button';b.className='category-chip'+(active?' active':'');b.textContent=label;b.setAttribute('aria-pressed',active?'true':'false');b.addEventListener('click',()=>{selectedCategory=label;$('#categorySearch').value='';$('#search').value='';renderCatalog();});nav.append(b)};
  makeChip('Все категории',selectedCategory==='Все категории');
  categories.forEach(c=>makeChip(c,selectedCategory===c));
- let arr=products.filter(p=>p.name.toLowerCase().includes(q));
- // Search is global; when the search field is empty, the selected category controls the view.
+ let arr=products.filter(p=>!q||p.name.toLowerCase().includes(q));
  if(!q&&selectedCategory!=='Все категории')arr=arr.filter(p=>(p.category||'Без категории')===selectedCategory);
+ if(inCategory&&cq)arr=arr.filter(p=>p.name.toLowerCase().includes(cq));
  arr=arr.filter(p=>{const a=available(p);if(sf==='available')return a!==null&&a>0;if(sf==='unknown')return a===null;if(sf==='zero')return a!==null&&a<=0;return true});
  const cmp=(a,b)=>sort==='priceAsc'?(a.price??Infinity)-(b.price??Infinity):sort==='priceDesc'?(b.price??-Infinity)-(a.price??-Infinity):sort==='stock'?(available(b)??-Infinity)-(available(a)??-Infinity):a.name.localeCompare(b.name,'ru');
  const list=$('#catalogList');list.innerHTML='';$('#catalogEmpty').classList.toggle('hidden',arr.length>0);
  if(!arr.length)return;
- // In category view, show a flat list of products; category navigation is a horizontal scroll strip.
  arr.sort((a,b)=>{
-  if(q||selectedCategory!=='Все категории')return cmp(a,b);
+  if(q||inCategory)return cmp(a,b);
   const ca=categories.indexOf(a.category||'Без категории'),cb=categories.indexOf(b.category||'Без категории');
   return ca-cb||cmp(a,b);
  });
@@ -102,7 +106,7 @@ function openInvoice(id){const o=orders.find(x=>x.id===id);if(!o)return;if(!o.in
  openModal(`<div id="invoiceDoc">
  <div class="invoice-head"><h2>НАКЛАДНАЯ</h2><div class="muted">Заказ ${o.id} · ${new Date(o.created).toLocaleDateString('ru-RU')}</div></div>
  <div class="formgrid"><label>Поставщик<input id="invSupplier" value="${esc(inv.supplier||'')}"></label><label>Покупатель<input id="invBuyer" value="${esc(inv.buyer||'')}"></label></div>
- <table class="invoice-table"><thead><tr><th>№</th><th>Товар</th><th>Количество</th><th>Цена</th><th>Сумма</th><th class="no-print"> </th></tr></thead><tbody id="invRows"></tbody></table>
+ <div class="invoice-table-wrap"><table class="invoice-table" id="invoiceTable"><colgroup><col><col><col><col><col><col></colgroup><thead><tr><th>№<span class="col-resizer" data-col="0" title="Перетащите, чтобы изменить ширину"></span></th><th>Товар<span class="col-resizer" data-col="1" title="Перетащите, чтобы изменить ширину"></span></th><th>Количество<span class="col-resizer" data-col="2" title="Перетащите, чтобы изменить ширину"></span></th><th>Цена<span class="col-resizer" data-col="3" title="Перетащите, чтобы изменить ширину"></span></th><th>Сумма<span class="col-resizer" data-col="4" title="Перетащите, чтобы изменить ширину"></span></th><th class="no-print"> </th></tr></thead><tbody id="invRows"></tbody></table></div><p class="invoice-resize-help no-print">Ширину столбцов меняйте, перетаскивая границы в заголовках. Высоту строки — за нижний угол поля наименования. Настройки ширины сохраняются на этом устройстве.</p>
  <div class="invoice-total">Итого: <span id="invTotal">0,00 ₽</span></div><div class="invoice-note">В том числе НДС: 0</div>
  <div class="invoice-note">Всего наименований: <strong id="invCount"></strong>, на сумму <strong id="invTotalText"></strong></div>
  <div class="invoice-note"><strong id="invWords"></strong></div>
@@ -110,15 +114,27 @@ function openInvoice(id){const o=orders.find(x=>x.id===id);if(!o)return;if(!o.in
  </div><div class="invoice-buttons"><button id="addInvRow" class="secondary">Добавить строку</button><button id="saveInvoice" class="primary">Сохранить накладную</button><button id="printInvoice" class="secondary">Печать / PDF</button><button id="shareInvoice" class="secondary">Поделиться текстом</button></div>`);
  const body=$('#invRows');(inv.items||[]).forEach(item=>addInvoiceRow(item));
  if(!(inv.items||[]).length)addInvoiceRow({productId:'',name:'',qty:1,price:0});
+ setupInvoiceColumnResizing();
  $('#addInvRow').addEventListener('click',()=>addInvoiceRow({productId:'',name:'',qty:1,price:0}));
  $('#saveInvoice').addEventListener('click',async()=>{o.invoice={supplier:$('#invSupplier').value,buyer:$('#invBuyer').value,releasedBy:$('#invReleased').value,receivedBy:$('#invReceived').value,items:[...body.querySelectorAll('tr')].map(readInvoiceRow)};o.supplier=o.invoice.supplier;o.buyer=o.invoice.buyer;await put('orders',o);orders=await all('orders');settings.supplier=o.invoice.supplier;settings.buyer=o.invoice.buyer;await saveState('settings',settings);renderOrders();toast('Накладная сохранена');});
  $('#printInvoice').addEventListener('click',()=>{saveInvoiceQuiet(o).then(()=>{prepareInvoicePrint();window.print()})});
  $('#shareInvoice').addEventListener('click',async()=>{const text=invoiceText(o);if(navigator.share){try{await navigator.share({title:'Накладная '+o.id,text})}catch(e){}}else{await navigator.clipboard?.writeText(text);toast('Текст накладной скопирован, если браузер разрешил копирование')}});
  recalcInvoice();
 }
+function setupInvoiceColumnResizing(){
+ const table=$('#invoiceTable');if(!table)return;
+ const cols=[...table.querySelectorAll('colgroup col')];
+ const defaults=[34,380,90,100,100,40],minima=[28,150,62,68,68,34];
+ let widths=defaults.slice();
+ try{const saved=JSON.parse(localStorage.getItem('invoiceColumnWidths')||'null');if(Array.isArray(saved)&&saved.length===cols.length)widths=saved.map((v,i)=>Math.max(minima[i],Math.min(900,Number(v)||defaults[i])))}catch{}
+ const apply=()=>{cols.forEach((c,i)=>c.style.width=widths[i]+'px');const wrap=table.closest('.invoice-table-wrap');table.style.width=Math.max(wrap?.clientWidth||0,widths.reduce((a,b)=>a+b,0))+'px'};
+ apply();
+ table.querySelectorAll('.col-resizer').forEach(handle=>{handle.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();const i=Number(handle.dataset.col),startX=e.clientX,startA=widths[i],startB=widths[i+1];if(!Number.isInteger(i)||i<0||i>=cols.length-1)return;handle.setPointerCapture?.(e.pointerId);const move=ev=>{const delta=ev.clientX-startX;let a=Math.max(minima[i],startA+delta),b=Math.max(minima[i+1],startB-(a-startA));if(b===minima[i+1]&&a-startA>startB-minima[i+1])a=startA+(startB-minima[i+1]);widths[i]=a;widths[i+1]=b;apply()};const up=()=>{window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up);try{localStorage.setItem('invoiceColumnWidths',JSON.stringify(widths))}catch{}};window.addEventListener('pointermove',move);window.addEventListener('pointerup',up,{once:true})})});
+ window.addEventListener('resize',apply,{once:true});
+}
 function addInvoiceRow(item){const body=$('#invRows'),tr=document.createElement('tr');tr.innerHTML=`<td class="idx"></td><td><div class="itemname-wrap"><textarea class="itemname" rows="2" aria-label="Полное наименование товара" spellcheck="false"></textarea><span class="itemname-print"></span></div></td><td><input class="qty right" type="number" step="any" min="0" aria-label="Количество"></td><td><input class="price right" type="number" step="any" min="0" aria-label="Цена"></td><td class="sum right">0,00</td><td class="no-print"><button class="danger rowdel">×</button></td>`;
  const nameField=tr.querySelector('.itemname');nameField.value=item.name||'';nameField.style.height='auto';requestAnimationFrame(()=>{nameField.style.height=Math.max(48,nameField.scrollHeight+2)+'px'});tr.querySelector('.qty').value=item.qty??1;tr.querySelector('.price').value=item.price??0;
- tr.querySelectorAll('input,textarea').forEach(inp=>inp.addEventListener('input',()=>{if(inp.classList.contains('itemname')){inp.style.height='auto';inp.style.height=Math.max(48,inp.scrollHeight+2)+'px'}recalcInvoice()}));tr.querySelector('.rowdel').addEventListener('click',()=>{tr.remove();recalcInvoice()});body.append(tr);recalcInvoice()}
+ tr.querySelectorAll('input,textarea').forEach(inp=>inp.addEventListener('input',()=>{if(inp.classList.contains('itemname')&&inp.scrollHeight>inp.clientHeight){inp.style.height=Math.max(48,inp.scrollHeight+2)+'px'}recalcInvoice()}));tr.querySelector('.rowdel').addEventListener('click',()=>{tr.remove();recalcInvoice()});body.append(tr);recalcInvoice()}
 function readInvoiceRow(tr){return {productId:'',name:tr.querySelector('.itemname').value,qty:Number(tr.querySelector('.qty').value)||0,price:Number(tr.querySelector('.price').value)||0}}
 function recalcInvoice(){const rows=[...($('#invRows')?.querySelectorAll('tr')||[])];let total=0;rows.forEach((tr,i)=>{tr.querySelector('.idx').textContent=i+1;const q=Number(tr.querySelector('.qty').value)||0,p=Number(tr.querySelector('.price').value)||0,s=q*p;total+=s;tr.querySelector('.sum').textContent=new Intl.NumberFormat('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2}).format(s)});if($('#invTotal'))$('#invTotal').textContent=money(total);if($('#invCount'))$('#invCount').textContent=rows.filter(tr=>tr.querySelector('.itemname').value.trim()).length;if($('#invTotalText'))$('#invTotalText').textContent=money(total);if($('#invWords'))$('#invWords').textContent=numberWordsRub(total)}
 async function saveInvoiceQuiet(o){o.invoice={supplier:$('#invSupplier').value,buyer:$('#invBuyer').value,releasedBy:$('#invReleased').value,receivedBy:$('#invReceived').value,items:[...$('#invRows').querySelectorAll('tr')].map(readInvoiceRow)};await put('orders',o);orders=await all('orders');}
@@ -133,7 +149,7 @@ function rubDecl(n){return plural(n,'рубль','рубля','рублей')}fu
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 async function photoAction(p){if(p.photo){openModal(`<h2>${esc(p.name)}</h2><img src="${p.photo}" alt="" style="display:block;max-width:100%;max-height:65vh;margin:auto"><div class="invoice-buttons"><button id="replacePhoto" class="primary">Заменить фото</button><button id="removePhoto" class="danger">Удалить фото</button></div>`);$('#replacePhoto').onclick=()=>pickPhoto(p);$('#removePhoto').onclick=async()=>{p.photo=null;await put('products',p);products=await all('products');closeModal();renderCatalog()};}else pickPhoto(p)}
 function pickPhoto(p){const input=document.createElement('input');input.type='file';input.accept='image/*';input.onchange=async()=>{const file=input.files[0];if(!file)return;if(file.size>6*1024*1024){toast('Фото больше 6 МБ. Выберите файл меньшего размера.');return}const data=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(file)});p.photo=data;await put('products',p);products=await all('products');closeModal();renderCatalog();toast('Фото сохранено на этом устройстве')};input.click()}
-$('#search').addEventListener('input',()=>{if($('#search').value.trim())selectedCategory='Все категории';renderCatalog()});$('#stockFilter').addEventListener('change',renderCatalog);$('#sort').addEventListener('change',renderCatalog);
+$('#search').addEventListener('input',()=>{if($('#search').value.trim())selectedCategory='Все категории';renderCatalog()});$('#categorySearch').addEventListener('input',renderCatalog);$('#stockFilter').addEventListener('change',renderCatalog);$('#sort').addEventListener('change',renderCatalog);
 $('#saveParties').addEventListener('click',async()=>{settings.supplier=$('#supplier').value;settings.buyer=$('#buyer').value;await saveState('settings',settings);toast('Реквизиты сохранены')});
 function parseExcel(file,skipRows){return new Promise((resolve,reject)=>{if(!window.XLSX){reject(new Error('Библиотека Excel не загрузилась. Подключитесь к интернету и обновите страницу.'));return}const reader=new FileReader();reader.onload=e=>{try{let wb=XLSX.read(e.target.result,{type:'array'}),ws=wb.Sheets[wb.SheetNames[0]],rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:null});resolve(rows.slice(skipRows))}catch(err){reject(err)}};reader.onerror=reject;reader.readAsArrayBuffer(file)})}
 const PRICE_CATEGORIES=new Set(['ЯЯ','БАКАЛЕЯ','БАТОНЧИКИ','БЫТОВЫЕ ТОВАРЫ','ВОДА','ЖЕВАТЕЛЬНАЯ РЕЗИНКА','ЗАЖИГАЛКИ','ЗАМОРОЗКА','ЗЕФИР','КАША,СУП,МИВИНА','КИНДЕР','КОЛБАСКИ','КОНДИТЕРСКИЕ ИЗДЕЛИЯ','КОНФЕТЫ В КОРОБКАХ','КОНФЕТЫ ВЕСОВЫЕ','КОРМ','КОФЕ','КРУПЫ ВЕСОВЫЕ','КРУПЫ ФАСОВКА','КУКУРУЗНЫЕ ПАЛОЧКИ','ЛЕДЕНЦЫ','ЛЕТО','МАЙОНЕЗ,КЕТЧУП,СОУС','МАКАРОНЫ','МОЛОЧНЫЕ ПРОДУКТЫ','МОРОЖЕНОЕ','НАША ФАСОВКА','НОВОГОДНИЕ ИГРУШКИ','НОВОГОДНИЕ ПОДАРКИ','НОВЫЙ ГОД','ПАКЕТЫ','ПАСХА','ПЕЧЕНЬЕ','ПЕЧЕНЬЕ В КОРРЕКСАХ','ПЕЧЕНЬЕ ВЕСОВОЕ','ПИВО','ПРЕСЕРВА','ПРИПРАВЫ','СМЕСЬ ПРИПРАВ','РАСТИТЕЛЬНОЕ МАСЛО','РЫБА','РЫБА К ПИВУ','РЫБНЫЕ КОНСЕРВЫ','СОКИ','СОЛЕНЬЯ','СУХИЕ ЗАВТРАКИ','СЫР ВЕСОВОЙ','ТОППИНГИ И СИРОПЫ','ХОТ ДОГ','ЧАЙ','ЧИПСЫ,СУХАРИКИ,ОРЕШКИ','ШОКОЛАД','ЭНЕРГЕТИКИ','ЯНЕНУЖНОЕ','ЯШКИНО']);

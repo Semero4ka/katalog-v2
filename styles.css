@@ -69,3 +69,22 @@ button,.filebutton{font:inherit;border:0;border-radius:8px;padding:10px 14px;cur
 .invoice-table .itemname-wrap{width:100%;min-width:0}
 .invoice-table textarea.itemname{box-sizing:border-box;display:block;width:100%;min-width:0;max-width:100%;height:auto;min-height:48px;padding:7px 8px;margin:0;border:1px solid #cfd6df;border-radius:6px;resize:vertical;white-space:pre-wrap;overflow-wrap:anywhere;word-break:normal;line-height:1.4;overflow:hidden}
 @media(max-width:760px){.category-nav{margin-left:-4px;margin-right:-4px;padding-left:4px;padding-right:4px}.invoice-table{table-layout:fixed;font-size:11px}.invoice-table th:nth-child(1),.invoice-table td:nth-child(1){width:25px}.invoice-table th:nth-child(2),.invoice-table td:nth-child(2){width:43%}.invoice-table th:nth-child(3),.invoice-table td:nth-child(3){width:54px}.invoice-table th:nth-child(4),.invoice-table td:nth-child(4),.invoice-table th:nth-child(5),.invoice-table td:nth-child(5){width:64px}.invoice-table textarea.itemname{padding:6px 5px;font-size:12px;min-height:48px}}
+
+/* Search within the currently selected category */
+.category-search-wrap{display:flex;align-items:center;gap:10px;margin:0 0 14px;padding:12px;background:#fff;border:1px solid var(--line);border-radius:10px}
+.category-search-wrap label{flex:0 0 auto;font-size:13px;font-weight:650;color:var(--navy)}
+.category-search-wrap input{flex:1;min-width:0}
+/* Resizable invoice columns and scrollable small-screen layout */
+.invoice-table-wrap{width:100%;overflow-x:auto;overscroll-behavior-x:contain}
+.invoice-table{table-layout:fixed;width:max-content;min-width:100%;margin:14px 0 4px}
+.invoice-table col{width:auto}
+.invoice-table th{position:relative;padding-right:12px;user-select:none}
+.invoice-table .col-resizer{position:absolute;top:0;right:-2px;width:9px;height:100%;cursor:col-resize;touch-action:none;z-index:2}
+.invoice-table .col-resizer:after{content:"";position:absolute;top:20%;bottom:20%;left:4px;width:2px;background:#aeb9c7;border-radius:2px}
+.invoice-table .col-resizer:hover:after,.invoice-table .col-resizer:active:after{background:var(--blue);width:3px}
+.invoice-table textarea.itemname{resize:vertical;overflow:auto;min-height:48px;max-height:420px}
+.invoice-resize-help{font-size:12px;color:var(--muted);margin:4px 0 12px}
+@media(max-width:760px){.category-search-wrap{align-items:stretch;flex-direction:column;gap:5px}.category-search-wrap label{font-size:12px}.invoice-table-wrap{margin-right:-4px}.invoice-resize-help{max-width:100%}}
+@media print{.category-search-wrap,.invoice-resize-help,.col-resizer{display:none!important}.invoice-table-wrap{overflow:visible!important}.invoice-table{width:100%!important;min-width:0!important}}
+
+.invoice-table th:nth-child(n),.invoice-table td:nth-child(n){width:auto!important}

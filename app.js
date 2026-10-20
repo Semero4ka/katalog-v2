@@ -27,12 +27,13 @@ async function init(){
  products=await all('products');cart=await loadState('cart',{});orders=await all('orders');settings=await loadState('settings',{supplier:'',buyer:''});
  $('#supplier').value=settings.supplier||'';$('#buyer').value=settings.buyer||'';
  renderAll();
- window._priceHistoryCache=await loadState('priceHistory',[]);if(window._priceHistoryCache.length)renderPriceReport(window._priceHistoryCache[0]);else renderPriceReport(null);
+ window._priceHistoryCache=await loadState('priceHistory',[]);if(window._priceHistoryCache.length)renderPriceReport(window._priceHistoryCache[0]);else renderPriceReport(null);renderCatalog();
  if('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./service-worker.js').catch(()=>{});
 }
 function available(p){return p.stockTotal===null||p.stockTotal===undefined?null:Math.max(0,Number(p.stockTotal)-reservedFor(p.id))}
 function reservedFor(id){let n=Number(cart[id]||0);for(const o of orders){if(o.reserves!==false){for(const it of o.items||[])if(it.productId===id)n+=Number(it.qty||0)}}return n}
 function productById(id){return products.find(p=>p.id===id)}
+function latestPriceChange(p){const report=(window._priceHistoryCache||[])[0];if(!report||!Array.isArray(report.changes))return null;const key=norm(p.name);return report.changes.find(x=>(x.type==='up'||x.type==='down')&&norm(x.name)===key)||null;}
 function totalCart(){return Object.entries(cart).reduce((sum,[id,q])=>sum+(Number(productById(id)?.price)||0)*Number(q),0)}
 function qtyCart(){return Object.values(cart).reduce((a,b)=>a+Number(b||0),0)}
 function renderAll(){renderCatalog();renderCart();renderOrders();$('#cartBadge').textContent=qtyCart();$('#productCount').textContent=`${products.length.toLocaleString('ru-RU')} позиций`;}
@@ -69,11 +70,23 @@ function renderCatalog(){
   if(p.photo){const im=document.createElement('img');im.src=p.photo;im.alt=p.name;im.style.cssText='width:100%;height:100%;object-fit:cover;border-radius:8px';thumb.append(im)}else thumb.textContent='Добавить фото';
   thumb.title='Нажмите, чтобы добавить или открыть фото';thumb.addEventListener('click',()=>photoAction(p));
   const info=document.createElement('div');info.innerHTML='<div class="pname"></div><div class="pmeta"></div>';info.querySelector('.pname').textContent=p.name;info.querySelector('.pmeta').textContent=`${p.category||'Без категории'} · Артикул: ${p.id}`;
-  const price=document.createElement('div');price.className='price';price.textContent=p.price==null?'Цена не указана':money(p.price);
+  const priceBox=document.createElement('div');priceBox.className='price-box';
+  const price=document.createElement('div');price.className='price';price.textContent=p.price==null?'Цена не указана':money(p.price);priceBox.append(price);
+  const priceChange=latestPriceChange(p);
+  if(priceChange){
+   const change=document.createElement('button');change.type='button';change.className='price-change-card '+(priceChange.type==='up'?'price-change-up':'price-change-down');
+   const delta=(priceChange.diff>0?'+':'')+money(priceChange.diff);
+   const pct=priceChange.pct===null||priceChange.pct===undefined?'':` (${priceChange.pct>0?'+':''}${Number(priceChange.pct).toLocaleString('ru-RU',{maximumFractionDigits:1})}%)`;
+   change.textContent=`Было ${money(priceChange.oldPrice)} · ${delta}${pct}`;
+   change.title='Нажмите, чтобы открыть полный отчёт сравнения цен';
+   change.setAttribute('aria-label',`Цена изменилась: раньше ${money(priceChange.oldPrice)}, сейчас ${money(priceChange.newPrice)}. ${priceChange.type==='up'?'Подорожало':'Подешевело'}. Открыть отчёт.`);
+   change.addEventListener('click',()=>{showView('settings');requestAnimationFrame(()=>$('#priceReport')?.scrollIntoView({behavior:'smooth',block:'start'}));});
+   priceBox.append(change);
+  }
   const stock=document.createElement('div');stock.className='stock '+(a===null?'':a>0?'good':'zero');stock.textContent=a===null?'Остаток не указан':`Доступно: ${fmtQty(a)}`;
   const add=document.createElement('div');add.className='addrow';const inp=document.createElement('input');inp.type='number';inp.min='0.001';inp.step='any';inp.value='1';inp.className='qtyinput';inp.setAttribute('aria-label','Количество');
   const btn=document.createElement('button');btn.className='primary addbtn';btn.textContent='В корзину';btn.addEventListener('click',()=>addToCart(p.id,inp.value));
-  add.append(inp,btn);row.append(thumb,info,price,stock,add);list.append(row);
+  add.append(inp,btn);row.append(thumb,info,priceBox,stock,add);list.append(row);
  });
  if(arr.length>1000){const more=document.createElement('p');more.className='muted';more.textContent=`Показаны первые 1000 из ${arr.length} товаров. Уточните поиск или выберите категорию.`;list.append(more)}
 }

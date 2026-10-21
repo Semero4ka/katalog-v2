@@ -41,7 +41,7 @@ function showView(v){currentView=v;document.querySelectorAll('.view').forEach(x=
 document.querySelectorAll('.nav').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.view)));
 function renderCatalog(){
  const q=$('#search').value.trim().toLowerCase(), cq=$('#categorySearch').value.trim().toLowerCase(), sf=$('#stockFilter').value, sort=$('#sort').value;
- const categories=[...new Set(products.map(p=>p.category||'Без категории'))];
+ const categories=[...new Set(products.map(p=>p.category||'Без категории'))].sort((a,b)=>a.localeCompare(b,'ru',{sensitivity:'base'}));
  if(selectedCategory!=='Все категории'&&!categories.includes(selectedCategory))selectedCategory='Все категории';
  const inCategory=selectedCategory!=='Все категории'&&!q;
  const categorySearchWrap=$('#categorySearchWrap');
